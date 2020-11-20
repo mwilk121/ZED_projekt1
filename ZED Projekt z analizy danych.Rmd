@@ -1,0 +1,77 @@
+---
+title: "ZED Projekt z analizy danych"
+author: "Magdalena Wilk"
+date: "11/20/2020"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: true
+    theme: cosmo
+    number_sections: yes
+    df_print: kable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Wymagania
+
+## Dane
+  {r} [Zrodlo] danych] (http://www.cs.put.poznan.pl/dbrzezinski/teaching/zed/wuhan_blood_sample_data_Jan_Feb_2020.xlsx)
+  {r} [Opis danych] (https://www.nature.com/articles/s42256-020-0180-7)
+
+## Executive summary
+raport powinien zaczynać się od rozdziału podsumowującego całą analizę, streszczającego najważniejsze spostrzeżenia analityka
+
+
+## Lista wymagan minimalnych [kolejnosc dowolna]
+Kod wyliczający wykorzystane biblioteki.
+Kod zapewniający powtarzalność wyników przy każdym uruchomieniu raportu na tych samych danych.
+Kod pozwalający wczytać dane z pliku.
+Kod czyszczący dane (np. zmiany nazw kolumn, tranformacja danych do innych jednostek, decyzje dotyczące brakujących danych).
+Sekcję podsumowującą rozmiar zbioru i podstawowe statystyki.
+Szczegółową analizę wartości atrybutów.
+Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji.
+Interaktywny wykres lub animację prezentującą zmianę wybranych atrybutów w czasie.
+Sekcję próbującą stworzyć klasyfikator przewidujący czy dany pacjent przeżyje (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność klasyfikacji powinna zostać oszacowana na podstawie kliku wybranych (i uzasadnionych) miar oceny klasyfikacji.
+Analizę ważności atrybutów najlepszego znalezionego modelu.
+Dodatkowo punktowane będzie wykonanie analizy typowej dla danych klinicznych, np. regresji logistycznej wraz z wzięciem pod uwagę czynników zakłócających (ang. confounding factors) lub regresji Coxa (ang. Cox Proportional-Hazards Model).
+
+## Dodatkowe uwagi
+Analityk nie musi, a nawet nie powinien, ograniczać się do powyższych punktów. Wszelkie dodatkowe techniki analizy danych, wizualizacje, spostrzeżenia będą pozytywnie wpływały na ocenę.
+
+Ewentualne konkluzje, znalezione zależności warto potwierdzić dokonując sprawdzenia istniejących wyników badań w literaturze naukowej (np. na Google Scholar czy PubMed).
+
+
+# Wykonanie
+
+## Podsumowanie
+TBA
+
+## Import bibliotek
+
+## Wczytanie i wstepna analiza danych
+wczytanie danych, przejrzenia danych i statystyk
+
+## Transformacja danych
+(np. zmiany nazw kolumn, tranformacja danych do innych jednostek, decyzje dotyczące brakujących danych)
+
+## Prezentacja czystych danych
+"Sekcja podsumowująca rozmiar zbioru i podstawowe statystyki"
+
+## Korelacja miedzy danymi
+"Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji."
+
+## Zmiana [atrybutu/ow] w czasie
+Interaktywny wykres lub animację prezentującą zmianę wybranych atrybutów w czasie.
+
+## Klasyfikator
+klasyfikator przewidujący czy dany pacjent przeżyje (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność klasyfikacji powinna zostać oszacowana na podstawie kliku wybranych (i uzasadnionych) miar oceny klasyfikacji.
+
+### Analizę ważności atrybutów najlepszego znalezionego modelu
+
+## Dodatkowa analiza
+analiza typowa dla danych klinicznych, np.: 
+
+* regresja logistyczna wraz z wzięciem pod uwagę czynników zakłócających (ang. confounding factors)  
+* regresja Coxa (ang. Cox Proportional-Hazards Model).  
