@@ -57,6 +57,8 @@ library(dplyr)
 library(tidyr)
 library(janitor)
 library(imputeTS)
+library(lares)
+library(plotly)
 ```
 
 ## Wczytanie i wstepna analiza danych
@@ -144,8 +146,8 @@ clean_NA <- function(input){
 vars <- colnames(colnames_cleaned)[-(1:7)]
 colnames_cleaned_dim<- dim(colnames_cleaned)
 cleaned <- data.frame(matrix(ncol=81,nrow=0))
-#for (p_id in distinct(colnames_cleaned, patient_id)$patient_id){
-for (p_id in 1:10){
+for (p_id in distinct(colnames_cleaned, patient_id)$patient_id){
+#for (p_id in 1:10){
   patient_data <- colnames_cleaned%>%filter(patient_id==p_id)
   row_count<- dim(patient_data)[1]
   dt=data.frame(matrix(ncol=0,nrow=row_count))
@@ -199,7 +201,25 @@ info_table <- data_frame(
   values
 )
 knitr::kable(info_table)
+#wykres death_bothgenders, alive_bothgenders
 invisible(remove(tmp))
+
+plot_data <- cleaned%>%select(patient_id, gender, admission_time, discharge_time, outcome) %>%group_by(patient_id) %>% summarise_all(funs(first))
+admission_plot <- ggplot() + 
+    coord_cartesian() +
+    scale_color_hue() +
+    facet_wrap(~outcome) +
+    layer(data=plot_data, 
+          mapping=aes(
+              x=admission_time, 
+              y=discharge_time, colour=factor(gender)
+              ), 
+          stat="identity", 
+          geom="point", 
+          position=
+              position_jitter()
+    )
+ggplotly(admission_plot)
 ```
 
 ## Analiza wartosci atrybutow
@@ -209,8 +229,55 @@ TBA
 ## Korelacja miedzy danymi
 "Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji."
 
+```{r correlation}
+# OK
+#TODO wiecej wynikow
+var_df<-cleaned[-(1:7)]
+plot_data <- corr_cross(var_df, 
+max_pvalue = 0.05,
+top = 30,
+rm.na=TRUE)
+#plot(plot_data)
+ggplotly(plot_data)
+```
+
 ## Zmiana [atrybutu/ow] w czasie
 Interaktywny wykres lub animację prezentującą zmianę wybranych atrybutów w czasie.
+
+```{r timeline, eval=FALSE}
+timeline_plot <- ggplot() + 
+    coord_cartesian() +
+    scale_color_hue() +
+    layer(data=cleaned, 
+          mapping=aes(
+              x=re_date, 
+              y=hypersensitive_cardiac_troponin_i, group=patient_id
+              ), 
+          stat="identity", 
+          geom="point", 
+          position=
+              position_jitter()
+    )
+ggplotly(timeline_plot)
+
+```
+
+```{r timeline2, eval=FALSE}
+timeline_plot <- ggplot(cleaned, aes(x=re_date, y=serum_chloride, colour=factor(patient_id), group=patient_id))  + geom_line() + geom_point() + facet_wrap(~outcome)
+ggplotly(timeline_plot)
+
+```
+
+
+
+
+```{r timeline3}
+#timeline_data  <-cleaned%>%select(patient_id,re_date, hemoglobin, glucose) %>% transmute(id=patient_id, re_date=as.Date(re_date), hemoglobin, glucose) %>%group_by(id, re_date) %>% summarise(avg_hemoglobin = mean(hemoglobin), avg_glucose=mean(glucose)) %>%group_by(id) %>% mutate(day_no=re_date-min(re_date)+1, avg_hemoglobin=round(avg_hemoglobin,2), avg_glucose=round(avg_glucose,2))%>%ungroup() %>%select(day_no,avg_hemoglobin, avg_glucose)
+timeline_data  <-cleaned%>%select(patient_id,re_date, hemoglobin, glucose, outcome, gender) %>% transmute(id=patient_id, re_date=as.Date(re_date), hemoglobin, glucose, outcome, gender) %>%group_by(id, re_date) %>% summarise(avg_hemoglobin = mean(hemoglobin), avg_glucose=mean(glucose), outcome=first(outcome), gender=first(gender)) %>%group_by(id) %>% mutate(day_no=re_date-min(re_date)+1, avg_hemoglobin=round(avg_hemoglobin,2), avg_glucose=round(avg_glucose,2))%>%ungroup() %>%select(day_no,avg_hemoglobin, avg_glucose, outcome, gender)
+
+timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin, shape=factor(gender)))+geom_point(color="blue")+geom_point(aes(day_no,avg_glucose, shape=factor(gender)),color="black") + facet_wrap(~outcome)
+ggplotly(timeline_plot)
+```
 
 ## Klasyfikator
 klasyfikator przewidujący czy dany pacjent przeżyje (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność klasyfikacji powinna zostać oszacowana na podstawie kliku wybranych (i uzasadnionych) miar oceny klasyfikacji.
