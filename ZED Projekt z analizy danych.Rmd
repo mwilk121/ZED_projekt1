@@ -49,15 +49,162 @@ Ewentualne konkluzje, znalezione zależności warto potwierdzić dokonując spra
 TBA
 
 ## Import bibliotek
+```{r libs_import, warning=FALSE}
+library(xlsx)
+library(DT)
+library(knitr)
+library(dplyr)
+library(tidyr)
+library(janitor)
+library(imputeTS)
+```
 
 ## Wczytanie i wstepna analiza danych
-wczytanie danych, przejrzenia danych i statystyk
+### Wczytanie danych, 
+```{r read_data, warning=FALSE, cache = TRUE}
+filename <- 'res/wuhan_blood_sample_data_Jan_Feb_2020.xlsx'
+raw_data <- read.xlsx(filename, 1)
+raw_data <- as_tibble(raw_data)
+```
+### Sprawdzenie surowych danych
+
+```{r peek_data}
+# OK
+#how many NA in variables
+mean(is.na(raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)))
+# var min i max
+min(raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD), na.rm = TRUE)
+max(raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD), na.rm = TRUE)
+
+glimpse(raw_data)
+mean(is.na(raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)))
+
+
+```
 
 ## Transformacja danych
 (np. zmiany nazw kolumn, tranformacja danych do innych jednostek, decyzje dotyczące brakujących danych)
 
+```{r transform_data}
+# NOT OK
+#ogarnac te brakujace daty
+
+#replace -1 with NA
+raw_data[raw_data==-1]<-NA
+
+#PATIENT_ID
+id_filled <- raw_data %>% fill(PATIENT_ID)
+
+
+#OTHER NA VALUES
+#is there any rows that doesn't have NA value?
+full_row_count <-dim(id_filled[complete.cases(id_filled),])[1]
+print(full_row_count)
+# NA values in variables:
+mean(is.na(id_filled %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)))
+# there are two patients with negative days, as their only blood sample results arrived one day after their clinical outcome
+
+
+#remove rows where all variables are empty
+vars <- colnames(id_filled)[-(1:7)]
+no_empty_rows<- id_filled[rowSums(is.na(id_filled[vars])) != length(vars), ]
+# NA values in variables:
+mean(is.na(no_empty_rows %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)))
+
+colnames_cleaned <- no_empty_rows %>% clean_names()
+
+```
+NA Values:
+
+```{r NA_cleaning, cache=TRUE}
+# NOT OK
+## ten kod daje oczekiwany wynik, ale z pewnoscia da sie (trzeba) go przerobic
+### czy nazwa R wziela sie od slowa "rozpacz"? 
+
+clean_NA_in_column<-function(column){
+  not_NA_count<-sum(!is.na(column))
+  if (not_NA_count>=2){
+    column <- na_interpolation(column, option = "linear")
+    column
+  }
+
+  else if (not_NA_count==1){
+    val <- first(na.omit(column))
+    column[is.na(column)] <- val
+    column
+  }
+  column
+}
+
+clean_NA <- function(input){
+  res <- sapply(input, function(x) clean_NA_in_column(x))
+  res
+}
+
+vars <- colnames(colnames_cleaned)[-(1:7)]
+colnames_cleaned_dim<- dim(colnames_cleaned)
+cleaned <- data.frame(matrix(ncol=81,nrow=0))
+#for (p_id in distinct(colnames_cleaned, patient_id)$patient_id){
+for (p_id in 1:10){
+  patient_data <- colnames_cleaned%>%filter(patient_id==p_id)
+  row_count<- dim(patient_data)[1]
+  dt=data.frame(matrix(ncol=0,nrow=row_count))
+  for (var in vars){
+    column <- patient_data%>%select(var)
+    res<-clean_NA_in_column(column)
+    dt<-cbind(dt,res)
+  }
+  patient_data[-(1:7)] = dt
+  cleaned<-rbind(cleaned, patient_data)
+}
+
+```
+
+
 ## Prezentacja czystych danych
 "Sekcja podsumowująca rozmiar zbioru i podstawowe statystyki"
+Szczegółowa analiza wartości atrybutów.
+
+```{r clean_data}
+
+
+DT::datatable(cleaned, style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
+```
+
+```{r clean_data_stats}
+all_dim <-dim(cleaned)
+tmp <- cleaned %>% select(patient_id, outcome, gender) %>% group_by(patient_id) %>% summarise(outcome_count = mean(outcome), gender_count =  mean(gender))
+
+# ile pacjentow
+patients_count <- length(distinct(cleaned, patient_id)$patient_id)
+# ile pomiarow
+measurements_count <- all_dim[1]
+# ile srednio pomiarow na pacjenta
+mean_measures <- measurements_count/patients_count
+# ile kobiet/mezczyzn
+genders <- tmp %>% count(gender_count) #Male 224, Female 151 # WYKRES
+# ile umarlo/przezylo
+outcomes <- tmp %>% count(outcome_count) #201 recovered, 174 died # WYKRES
+# ile kolumn
+columns_count <- all_dim[2]
+# ile atrybutow
+vars_count <- all_dim[2]-7
+# ile zostalo wartosci NA
+na_left <- round(100*mean(is.na(cleaned)), 0)
+
+titles <- c("Liczba pacjentów", "Liczba pomiarów", "Średnia liczba pomiarów", "K", "M", "Smierc", "Zycie :(", "Liczba wierszy", "Liczba zmiennych", "Brakujace wartosci [%]")
+values <- c(patients_count,measurements_count,mean_measures,1, 2, 0,1, columns_count,vars_count, na_left)
+info_table <- data_frame(
+  titles,
+  values
+)
+knitr::kable(info_table)
+invisible(remove(tmp))
+```
+
+## Analiza wartosci atrybutow
+Szczegółową analizę wartości atrybutów.
+TBA
 
 ## Korelacja miedzy danymi
 "Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji."
