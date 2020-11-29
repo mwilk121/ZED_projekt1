@@ -119,11 +119,7 @@ colnames_cleaned <- no_empty_rows %>% clean_names()
 NA Values:
 
 ```{r NA_cleaning, cache=TRUE}
-# NOT OK
-## ten kod daje oczekiwany wynik, ale z pewnoscia da sie (trzeba) go przerobic
-### czy nazwa R wziela sie od slowa "rozpacz"? 
-
-clean_NA_in_column<-function(column){
+clean_NA<-function(column){
   not_NA_count<-sum(!is.na(column))
   if (not_NA_count>=2){
     column <- na_interpolation(column, option = "linear")
@@ -138,27 +134,7 @@ clean_NA_in_column<-function(column){
   column
 }
 
-clean_NA <- function(input){
-  res <- sapply(input, function(x) clean_NA_in_column(x))
-  res
-}
-
-vars <- colnames(colnames_cleaned)[-(1:7)]
-colnames_cleaned_dim<- dim(colnames_cleaned)
-cleaned <- data.frame(matrix(ncol=81,nrow=0))
-for (p_id in distinct(colnames_cleaned, patient_id)$patient_id){
-#for (p_id in 1:10){
-  patient_data <- colnames_cleaned%>%filter(patient_id==p_id)
-  row_count<- dim(patient_data)[1]
-  dt=data.frame(matrix(ncol=0,nrow=row_count))
-  for (var in vars){
-    column <- patient_data%>%select(var)
-    res<-clean_NA_in_column(column)
-    dt<-cbind(dt,res)
-  }
-  patient_data[-(1:7)] = dt
-  cleaned<-rbind(cleaned, patient_data)
-}
+cleaned<- colnames_cleaned%>% group_by(patient_id) %>% mutate_each(funs(clean_NA))
 
 ```
 
