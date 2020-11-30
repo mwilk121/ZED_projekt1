@@ -1,7 +1,7 @@
 ---
 title: "ZED Projekt z analizy danych"
 author: "Magdalena Wilk"
-date: "11/20/2020"
+date: "`r Sys.Date()`"
 output: 
   html_document: 
     toc: yes
