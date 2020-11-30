@@ -12,11 +12,13 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = FALSE, eval=FALSE)
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE, eval=TRUE)
 ```
 
 # Podsumowanie
-TBA
+Wstępna analiza surowych danych pokazała bardzo dużą ilość brakujących danych (powyżej 80%). Większość wierszy zawierała wyniki co najwyżej kilku z kilkudziesięcie (powyżej 70) atrybutów. Podczas czyszczenia danych usunięto kilka atrybutów nieposiadających żadnych wartości. W innych kolumnach częściowo uzupełniono brakujące wartości wykorzystując interpolację lub stałą wartość. W zbiorze wynikowym pozostawiono ok 8% wartości nieokreślonych.
+W wyczyszczonym zbiorze danych znajduje się 5606 wierszy, które zawierają wyniki badań 360 pacjentów. Wśród pacjentów było 212 mężczyzn oraz 149 kobiet. Przeżyło 166 pacjentów (30.9% chorych kobiet i 56.6% chorych mężczyzn). Dane zbierane były w okresie 10.01.2020 - 04.03.2020.
+Atrybuty opisują wyniki badań krwi pacjentów. Między większością atrybutów zachodziła korelacja (negatywna lub pozytywna). 
 
 # Przygotowanie srodowiska i danych
 
@@ -70,7 +72,7 @@ Pierwsze 30 wierszy ze zbioru:
 DT::datatable(head(raw_data, 30), style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip'))
 ```
 ***
-Podstawowe statystyki dla calego zbioru:
+Podstawowe statystyki dla całego zbioru:
 
 ```{r raw_data2, echo=FALSE}
 raw_attributes<-raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)
@@ -80,17 +82,17 @@ min_val<-min(raw_attributes, na.rm = TRUE)
 max_val<-max(raw_attributes, na.rm = TRUE)
 patients<-length(unique(raw_data$PATIENT_ID))-1
 min_admission_date<-min(raw_data$Admission.time)
-max_admission_date<-min(raw_data$Discharge.time)
+max_discharge_date<-max(raw_data$Discharge.time)
 
 writeLines(paste(" Dane bedace wartoscami brakujacymi (NA): ", na_mean, "%", "\n",
 "Wartosc minimalna: ", min_val, "\n",
 "Wartosc maksymalna: ", max_val, "\n",
 "Liczba pacjentów: ", patients, "\n",
-"Okres zbierania danych: ", min_admission_date," - ",max_admission_date))
+"Okres zbierania danych: ", min_admission_date," - ",max_discharge_date))
 
 ```
 ***
-Podstawowe statystyki dla poszczegolnych atrybutow:
+Podstawowe statystyki dla poszczególnych atrybutów:
 
 ```{r raw_data3,  echo=FALSE}
 custom_summarize(raw_attributes)
@@ -99,11 +101,14 @@ custom_summarize(raw_attributes)
 ## Transformacja danych
 
 ### Wstepne czyszczenie danych
-Wstepne czyszczenie danych:
 
-* uzupelnienie kolumny PATIENT_ID  
-* usuniecie pustych wierszy i kolumn  
-* zmiana nazw kolumn  
+Wstępne czyszczenie danych:
+
+* zamiana wartości -1 na NA
+* uzupełnienie kolumny PATIENT_ID  
+* usunięcie pustych wierszy i kolumn  
+* zmiana nazw kolumn
+* przypisanie czytelnych wartości w kolumnach outcome (wynik) i gender (płeć)
 
 ```{r transform_data, eval=TRUE}
 #replace -1 with NA
@@ -189,11 +194,11 @@ info_table <- tibble(
 knitr::kable(info_table,format="html",col.names=c('Parametr', 'Wartosc'))
 ```
 ***
-```{r plot_data,  echo=FALSE}
+```{r plot_data, echo=FALSE}
 plot_data <- cleaned%>%select(patient_id, gender, admission_time, discharge_time, outcome) %>%group_by(patient_id) %>% summarise_all(list(first))
 
 ```
-Wykresy prezentujące podział danych ze względu na płeć i wynik:
+Wykresy prezentujące podział danych ze względu na płeć i rezultat:
 ```{r clean_data_plot_distr, echo=FALSE}
 plot_data %>% distr(outcome, gender)
 ```
@@ -203,7 +208,8 @@ plot_data %>% distr(outcome, gender)
 Wykres obrazujący czasy przyjęcia i wypisania lub śmierci z wyróżnieniem płci:
 
 ```{r clean_data_plot_timeline, warning=FALSE, message=FALSE, echo=FALSE}
-# todo
+# todo tytul i podpisy
+# + ggtitle('Zmiana wartosci hemoglobiny i glukozy w czasie')+ labs(y="Wartosc atrybutu", x = "Dzien hospitalizacji")
 admission_plot <- ggplot() + 
     coord_cartesian() +
     scale_color_hue() +
@@ -212,20 +218,20 @@ admission_plot <- ggplot() +
           mapping=aes(
               x=admission_time, 
               y=discharge_time, 
-              colour=factor(gender)
+              colour=gender
               ), 
           stat="identity", 
           geom="point", 
           position=
               position_jitter()
-    )
+    )+ ggtitle('Czas pobytu w szpitalu')+ labs(y="Data przyjecia", x = "Data wypisania lub smierci")
 
 ggplotly(admission_plot)
 
 ```
 ***
 
-Tabela pokazująca 30 pierwszych rekordow po wyczyszczeniu danych:
+Tabela pokazująca 30 pierwszych rekordów po wyczyszczeniu danych:
 
 ```{r clean_data_peek, echo=FALSE}
 DT::datatable(head(cleaned,30), style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
@@ -240,7 +246,7 @@ custom_summarize(attributes)
 ```
 ***
 
-Histogramy przedstawiajace rozklad atrybutow:
+Histogramy przedstawiajace rozkład atrybutów:
 
 ```{r attributes_analysis_summary, echo=FALSE, warning=FALSE}
 page_plot<-function(page_no, prow=3, pcol=3){
@@ -287,24 +293,27 @@ ggplotly(plot_data)
 
 Poniższy wykres przedstawia wartości atrybutów hemoglobin (poziom hemoglobiny we krwi) oraz glucose (poziom glukozy we krwi) dla poszczególnych dni pobytu pacjenta w szpitalu. Celem wykresu jest próba pokazania zmiany tych atrybutów w czasie hospitalizacji pacjentów. 
 
-```{r timeline3, echo=FALSE, warning=FALSE, message=FALSE}
-# todo linia z wartoscia srednia
+```{r timeline3, echo=FALSE, warning=FALSE, message=FALSE, eval=TRUE}
 timeline_data  <-cleaned%>%select(patient_id,re_date, hemoglobin, glucose, outcome, gender) %>% transmute(id=patient_id, re_date=as.Date(re_date), hemoglobin, glucose, outcome, gender) %>%group_by(id, re_date) %>% summarise(avg_hemoglobin = mean(hemoglobin), avg_glucose=mean(glucose), outcome=first(outcome), gender=first(gender)) %>%group_by(id) %>% mutate(day_no=re_date-min(re_date)+1, avg_hemoglobin=round(avg_hemoglobin,2), avg_glucose=round(avg_glucose,2))%>%ungroup() %>%select(day_no,avg_hemoglobin, avg_glucose, outcome, gender)
 
-timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin,fill=factor(gender) ))+geom_point(color="black", shape=15)+geom_point(aes(day_no,avg_glucose,fill=factor(gender) ),shape=19,color="black") + facet_wrap(~outcome)
+mean_h <- timeline_data %>% group_by(day_no, gender) %>%summarise(mean_hemoglobin=mean(avg_hemoglobin, na.rm=TRUE))
+mean_g <- timeline_data %>% group_by(day_no, gender) %>%summarise(mean_glucose=mean(avg_glucose, na.rm=TRUE))
 
+timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin,fill=gender ))+geom_point(color="black", shape=15)+geom_point(aes(day_no,avg_glucose,fill=gender ),shape=19,color="black") + ggtitle('Zmiana wartosci hemoglobiny i glukozy w czasie') + facet_wrap(~outcome)
+timeline_plot <-timeline_plot+geom_line(data=mean_h, aes(x=day_no, y=mean_hemoglobin, color=gender))+geom_line(data=mean_g, aes(x=day_no, y=mean_glucose, color=gender)) + labs(y="Wartosc atrybutu", x = "Dzien hospitalizacji")
 ggplotly(timeline_plot)
 ```
 
 
 # Klasyfikator
+
 Przygotowanie danych do klasyfikacji:
  
- * redukcja danych opisujacych pojedynczego pacjenta do jednego wiersza, z zachowaniem najwczesniejszych wartosci atrybutow (żeby przewidziec smierc pacjenta jak najwczesniej)
- * usuniecie kolumn niebedacych atrybutami
- * podzial na zbiory uczacy i testujacy
- * usuniecie wierszy i kolumn, w ktorych wartosci brakujace to wiecej niz 40% danych
- * przypisanie wartosci sredniej atrybutow do wartosci brakujacych
+ * redukcja danych opisujacych pojedynczego pacjenta do jednego wiersza, z zachowaniem najwcześniejszych wartosci atrybutów (żeby jak najszybciej przewidziec śmierć pacjenta)
+ * usunięcie kolumn niebędących atrybutami
+ * podział na zbiory uczący i testujący
+ * usunięcie wierszy i kolumn, w ktorych wartości brakujące to wiecej niż 80% danych
+ * przypisanie wartości średniej atrybutów do pozostałych wartości brakujących
  
 ```{r preparing_data, echo=FALSE, warning=FALSE, message=FALSE}
 ml_data<- cleaned%>%group_by(patient_id)%>%summarise_all(funs(first))
