@@ -41,7 +41,7 @@ set.seed(23)
 filename <- 'res/wuhan_blood_sample_data_Jan_Feb_2020.xlsx'
 
 custom_summarize<-function(df){
-res<-df%>%sapply(function(x){
+  res<-df%>%sapply(function(x){
     c(
         min=round(min(x,na.rm = TRUE),2), 
         median=round(median(x,na.rm = TRUE),2), 
@@ -53,7 +53,6 @@ res<-df%>%sapply(function(x){
         ))}) %>%  data.frame()
   DT::datatable(res, style="bootstrap", filter = "top", rownames = TRUE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
 }
-
 ```
 
 
@@ -70,13 +69,13 @@ dim(raw_data)
 ### Krótka analiza surowych danych
 Pierwsze 500 wierszy ze zbioru:
 
-```{r raw_data1, eval=TRUE, echo=FALSE}
+```{r raw_data1, echo=FALSE}
 DT::datatable(head(raw_data, 500), style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip'))
 ```
-
+***
 Podstawowe statystyki dla calego zbioru:
 
-```{r raw_data2, eval=TRUE, echo=FALSE}
+```{r raw_data2, echo=FALSE}
 raw_attributes<-raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)
 
 na_mean<-round(100*mean(is.na(raw_attributes)),0)
@@ -93,10 +92,10 @@ writeLines(paste(" Dane bedace wartoscami brakujacymi (NA): ", na_mean, "%", "\n
 "Okres zbierania danych: ", min_admission_date," - ",max_admission_date))
 
 ```
-
+***
 Podstawowe statystyki dla poszczegolnych atrybutow:
 
-```{r raw_data3, eval=TRUE, echo=FALSE}
+```{r raw_data3,  echo=FALSE}
 custom_summarize(raw_attributes)
 ```
 
@@ -154,48 +153,59 @@ clean_NA<-function(column){
 #  clean_NA
 cleaned<- colnames_cleaned%>% group_by(patient_id) %>% mutate_each(list(clean_NA))
 
-#extract columns with attibutes only
+#extract columns with attributes only
 attributes<-cleaned[-(1:7)]
 ```
 
 
 # Wyczyszczone dane - podsumowanie
 
-Tabela pokazująca wyczyszczone dane:
+## Przeglad danych
 
-```{r clean_data, eval=TRUE}
-DT::datatable(cleaned, style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
-```
 
 Podsumowanie zbioru:
 
-```{r clean_data_stats, eval=TRUE}
-all_dim <-dim(cleaned)
-tmp <- cleaned %>% select(patient_id, outcome, gender) %>% group_by(patient_id) %>% summarise(outcome_count = mean(outcome), gender_count =  mean(gender))
+```{r clean_data_stats, eval=TRUE, message=FALSE,results="hide", echo=FALSE}
+mean_gender_outcome <- cleaned %>% select(patient_id, outcome, gender) %>% group_by(patient_id) %>% summarise(outcome_count = mean(outcome), gender_count =  mean(gender))
 
-patients_count <- length(unique(raw_data$PATIENT_ID))-1
+# get some info about all data
+all_dim <-dim(cleaned)
+patients_count <- length(unique(cleaned$patient_id))-1
 measurements_count <- all_dim[1]
-mean_measures <- measurements_count/patients_count
-genders <- tmp %>% count(gender_count) #Male 224, Female 151 # WYKRES
-outcomes <- tmp %>% count(outcome_count) #201 recovered, 174 died # WYKRES
+mean_measures <- round(measurements_count/patients_count,0)
+genders <- mean_gender_outcome %>% count(gender_count) #Male 224, Female 151 # 1-M, 2-F
+outcomes <- mean_gender_outcome %>% count(outcome_count) #201 recovered, 174 died # 0-Fatality, 1-Alive
 columns_count <- all_dim[2]
-vars_count <- all_dim[2]-7
+vars_count <- dim(attributes)[2]
 na_left <- round(100*mean(is.na(cleaned)), 0)
 
-titles <- c("Liczba pacjentów", "Liczba pomiarów", "Średnia liczba pomiarów", "K", "M", "Smierc", "Zycie :(", "Liczba wierszy", "Liczba zmiennych", "Brakujace wartosci [%]")
-values <- c(patients_count,measurements_count,mean_measures,1, 2, 0,1, columns_count,vars_count, na_left)
-info_table <- data_frame(
+titles <- c("Liczba pacjentów", "Liczba pomiarów", "Średnia liczba pomiarów na pacjenta", "K", "M", "Smierc", "Wypisanie ze szpitala", "Liczba wierszy", "Liczba zmiennych", "Procent brakujacych wartosci")
+values <- c(patients_count,measurements_count,mean_measures,genders$n[1], genders$n[2], outcomes$n[1], outcomes$n[2], columns_count,vars_count, na_left)
+info_table <- tibble(
   titles,
   values
 )
-knitr::kable(info_table)
+```
 
-cleaned %>% distr(outcome, gender)
+```{r clean_data_stats_show, eval=TRUE, echo=FALSE, fig.align='center', fig.width=3}
+knitr::kable(info_table,format="html",col.names=c('Parametr', 'Wartosc'))
+```
+***
+```{r plot_data, eval=TRUE, echo=FALSE}
+plot_data <- cleaned%>%select(patient_id, gender, admission_time, discharge_time, outcome) %>%group_by(patient_id) %>% summarise_all(list(first))
 
-#wykres death_bothgenders, alive_bothgenders
-invisible(remove(tmp))
+```
+Wykresy prezentujące podział danych ze względu na płeć i wynik:
+```{r clean_data_plot_distr, eval=TRUE, echo=FALSE}
+plot_data %>% distr(outcome, gender)
+```
 
-plot_data <- cleaned%>%select(patient_id, gender, admission_time, discharge_time, outcome) %>%group_by(patient_id) %>% summarise_all(funs(first))
+***
+
+Wykres obrazujący czasy przyjęcia i wypisania lub śmierci z wyróżnieniem płci:
+
+```{r clean_data_plot_timeline, eval=TRUE, warning=FALSE, message=FALSE, echo=FALSE}
+
 admission_plot <- ggplot() + 
     coord_cartesian() +
     scale_color_hue() +
@@ -203,73 +213,83 @@ admission_plot <- ggplot() +
     layer(data=plot_data, 
           mapping=aes(
               x=admission_time, 
-              y=discharge_time, colour=factor(gender)
+              y=discharge_time, 
+              colour=factor(gender)
               ), 
           stat="identity", 
           geom="point", 
           position=
               position_jitter()
     )
+
 ggplotly(admission_plot)
 
+```
+***
 
+Tabela pokazująca 30 pierwszych rekordow po wyczyszczeniu danych:
 
+```{r clean_data_peek, eval=TRUE, echo=FALSE}
+DT::datatable(head(cleaned,30), style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
 ```
 
-
 ## Analiza wartosci atrybutow
-Szczegółową analizę wartości atrybutów.
-```{r analiza}
-#data.frame(unclass(summary(tmp)), check.names = FALSE, stringsAsFactors = FALSE)
-res <- attributes%>% sapply(function(x){c(min=min(x,na.rm = TRUE), median=median(x,na.rm = TRUE), mean = mean(x,na.rm = TRUE),max=max(x,na.rm = TRUE), variance=var(x,na.rm = TRUE), standard_deviation=sd(x,na.rm = TRUE), na_count = sum(is.na(x)))}) %>%  data.frame()
-rd<- dim(res)
-rows<-rd[1]
-cols<-rd[2]
 
+Podsumowanie każdego z atrybutów:
 
-DT::datatable(res, style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
+```{r attributes_summary, echo=FALSE}
+custom_summarize(attributes)
+```
+***
 
+Histogramy przedstawiajace rozklad atrybutow:
 
-
+```{r attributes_analysis_summary, echo=FALSE, warning=FALSE}
 page_plot<-function(page_no, prow=3, pcol=3){
   print(
-  ggplot(gather(attributes), na.action="na.omit", aes(value)) +   ggtitle(" title")+
+  ggplot(gather(attributes), na.action="na.omit", aes(value)) +   ggtitle("Rozklad wartosci")+
     geom_histogram(bins = 10) + 
     facet_wrap_paginate
   (~key, ncol = pcol, nrow = prow, scales = "free_x", page = page_no)) 
   
 }
+cols<-dim(attributes)[2]
 plot_row = 4
 plot_col = 4
 pages<- ceiling(cols/(plot_row*plot_col))
 for (i in 1:pages){
 page_plot(i, plot_row, plot_col)
-  
 }
+
 ```
 
 
-
 ## Korelacja miedzy danymi
-"Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji."
 
-```{r correlation_top}
+Poniższy graf przedstawia korelację pomiędzy parami atrybutów. Grubość lini łączącej dwa atrybuty jest zależna od współczynnika korelacji, natomiast kolor oznacza korelację dodatnią (kolor zielony) lub ujemną (kolor czerwony)
+
+```{r correlation_all, fig.height=40, fig.width=40, echo=FALSE, warning=FALSE}
+names<-colnames(attributes)
+Q <- qgraph(cor(attributes, use="complete.obs"), legend=TRUE, nodeNames=names, legend.cex=1.3, title ="Korelacja pomiedzy atrybutami", title.cex=8)
+```
+
+***
+
+Wykres przedstawiający 20 par atrybutów z największą korelacją:
+
+```{r correlation_top, echo=FALSE, warning=FALSE, message=FALSE}
 plot_data <- corr_cross(attributes, 
 max_pvalue = 0.05,
 top = 20,
 rm.na=TRUE)
 ggplotly(plot_data)
 ```
-
-```{r correlation_all, fig.height=40, fig.width=40}
-names<-colnames(attributes)
-Q <- qgraph(cor(attributes, use="complete.obs"), legend=TRUE, nodeNames=names, legend.cex=1.3, title ="Korelacja pomiedzy atrybutami", title.cex=8)
-Q <- qgraph(cor(attributes, use="complete.obs"), layout = "spring", legend=TRUE, nodeNames=names, legend.cex=1.3, title ="Korelacja pomiedzy atrybutami",title.cex=8)
-```
-
 ## Zmiana [atrybutu/ow] w czasie
+
 Interaktywny wykres lub animację prezentującą zmianę wybranych atrybutów w czasie.
 
+
+to wywalic:
 ```{r timeline, eval=FALSE}
 timeline_plot <- ggplot() + 
     coord_cartesian() +
@@ -287,26 +307,36 @@ timeline_plot <- ggplot() +
 ggplotly(timeline_plot)
 
 ```
-
+to wywalic:
 ```{r timeline2, eval=FALSE}
 timeline_plot <- ggplot(cleaned, aes(x=re_date, y=serum_chloride, colour=factor(patient_id), group=patient_id))  + geom_line() + geom_point() + facet_wrap(~outcome)
 ggplotly(timeline_plot)
 
 ```
 
+Poniższy wykres przedstawia średnie wartości atrybutów hemoglobin (poziom hemoglobiny we krwi) oraz glucose (poziom glukozy we krwi) dla poszczególnych dni pobytu pacjenta w szpitalu. Celem wykresu jest próba pokazania zmiany tych atrybutów w czasie hospitalizacji, czyli z założenia najcięższego przebiegu choroby. 
 
-
-
-```{r timeline3}
-#timeline_data  <-cleaned%>%select(patient_id,re_date, hemoglobin, glucose) %>% transmute(id=patient_id, re_date=as.Date(re_date), hemoglobin, glucose) %>%group_by(id, re_date) %>% summarise(avg_hemoglobin = mean(hemoglobin), avg_glucose=mean(glucose)) %>%group_by(id) %>% mutate(day_no=re_date-min(re_date)+1, avg_hemoglobin=round(avg_hemoglobin,2), avg_glucose=round(avg_glucose,2))%>%ungroup() %>%select(day_no,avg_hemoglobin, avg_glucose)
+```{r timeline3, eval=TRUE, echo=FALSE}
+#dodac takie smieszne tlo
 timeline_data  <-cleaned%>%select(patient_id,re_date, hemoglobin, glucose, outcome, gender) %>% transmute(id=patient_id, re_date=as.Date(re_date), hemoglobin, glucose, outcome, gender) %>%group_by(id, re_date) %>% summarise(avg_hemoglobin = mean(hemoglobin), avg_glucose=mean(glucose), outcome=first(outcome), gender=first(gender)) %>%group_by(id) %>% mutate(day_no=re_date-min(re_date)+1, avg_hemoglobin=round(avg_hemoglobin,2), avg_glucose=round(avg_glucose,2))%>%ungroup() %>%select(day_no,avg_hemoglobin, avg_glucose, outcome, gender)
 
-timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin, shape=factor(gender)))+geom_point(color="blue")+geom_point(aes(day_no,avg_glucose, shape=factor(gender)),color="black") + facet_wrap(~outcome)
+#timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin, shape=factor(gender)))+geom_point(color="blue")+geom_point(aes(day_no,avg_glucose, shape=factor(gender)),color="black") + facet_wrap(~outcome)
+
+#timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin,fill=factor(gender), ))+geom_point(color="black", shape=15)+geom_point(aes(day_no,avg_glucose ),color="darkblue",shape=19) + facet_wrap(~outcome)
+
+#timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin,color=factor(gender), ))+geom_point( shape=15)+geom_point(aes(day_no,avg_glucose ),shape=19) + facet_wrap(~outcome)
+
+
+timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin,fill=factor(gender) ))+geom_point(color="black", shape=15)+geom_point(aes(day_no,avg_glucose,fill=factor(gender) ),shape=19,color="black") + facet_wrap(~outcome)
+#w legendzie nie ma drugiej serii >:(
+
 ggplotly(timeline_plot)
 ```
 
-## Klasyfikator
+
+# Klasyfikator
 klasyfikator przewidujący czy dany pacjent przeżyje (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność klasyfikacji powinna zostać oszacowana na podstawie kliku wybranych (i uzasadnionych) miar oceny klasyfikacji.
+
 ```{r preparing_data}
 ml_data<- cleaned%>%group_by(patient_id)%>%summarise_all(funs(last))
 ml_data<-na_mean(ml_data) #TO ZROBIC OSOBNO DLA ZBIORU TESTUJACEGO I UCZACEGO!
