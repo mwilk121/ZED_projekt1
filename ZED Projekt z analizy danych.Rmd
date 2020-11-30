@@ -18,7 +18,8 @@ knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
 # Podsumowanie
 Wstępna analiza surowych danych pokazała bardzo dużą ilość brakujących danych (powyżej 80%). Większość wierszy zawierała wyniki co najwyżej kilku z kilkudziesięcie (powyżej 70) atrybutów. Podczas czyszczenia danych usunięto kilka atrybutów nieposiadających żadnych wartości. W innych kolumnach częściowo uzupełniono brakujące wartości wykorzystując interpolację lub stałą wartość. W zbiorze wynikowym pozostawiono ok 8% wartości nieokreślonych.
 W wyczyszczonym zbiorze danych znajduje się 5606 wierszy, które zawierają wyniki badań 360 pacjentów. Wśród pacjentów było 212 mężczyzn oraz 149 kobiet. Przeżyło 166 pacjentów (30.9% chorych kobiet i 56.6% chorych mężczyzn). Dane zbierane były w okresie 10.01.2020 - 04.03.2020.
-Atrybuty opisują wyniki badań krwi pacjentów. Między większością atrybutów zachodziła korelacja (negatywna lub pozytywna). 
+Atrybuty opisują wyniki badań krwi pacjentów. Między większością atrybutów zachodzi korelacja (negatywna lub pozytywna). 
+Udało się znaleźć model klasyfikatora, który dla podanych danych testowych osiąga potrafi przewidzieć, czy pacjent przeżyje z dokładnością wynoszącą 95%.
 
 # Przygotowanie srodowiska i danych
 
@@ -312,13 +313,14 @@ Przygotowanie danych do klasyfikacji:
  * redukcja danych opisujacych pojedynczego pacjenta do jednego wiersza, z zachowaniem najwcześniejszych wartosci atrybutów (żeby jak najszybciej przewidziec śmierć pacjenta)
  * usunięcie kolumn niebędących atrybutami
  * podział na zbiory uczący i testujący
- * usunięcie wierszy i kolumn, w ktorych wartości brakujące to wiecej niż 80% danych
+ * usunięcie wierszy i kolumn, w ktorych wartości brakujące to wiecej niż 20% danych
  * przypisanie wartości średniej atrybutów do pozostałych wartości brakujących
  
 ```{r preparing_data, echo=FALSE, warning=FALSE, message=FALSE}
 ml_data<- cleaned%>%group_by(patient_id)%>%summarise_all(funs(first))
-ml_data<-ml_data[-(1:6)]
-ml_data<-ml_data[which(rowMeans(!is.na(ml_data)) > 0.8), which(colMeans(!is.na(ml_data)) > 0.8)]
+ml_data<-ml_data[-(1:2)]
+ml_data$gender<- as.numeric(ml_data$gender)
+ml_data<-ml_data[which(rowMeans(!is.na(ml_data)) > 0.2), which(colMeans(!is.na(ml_data)) > 0.2)]
 
 inTraining <- createDataPartition( y = ml_data$outcome, p = .75, list = FALSE)
 training <- ml_data[ inTraining,]
@@ -361,5 +363,3 @@ ggplot(fitTune) + theme_bw()
 confusionMatrix(data = prediction, 
                 testing$outcome)
 ```
-
-Dokładność predykcji wynosi 93% i z pewnością nie jest to najlepszy możliwy wynik. Warto jednak zwrócić uwagę na wartości otrzymane w macierzy pomyłek: liczba uzyskanych wartości False Negative (model przewidział, że pacjent przeżyje, a w rzeczywistości on umiera) jest równa zero. W rozważanym przypadku lepiej zakładać, że pacjent jest w stanie gorszym niż jest w rzeczywistości, niż odwrotnie.
