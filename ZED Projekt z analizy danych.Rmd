@@ -21,7 +21,7 @@ W wyczyszczonym zbiorze danych znajduje się 5606 wierszy, które zawierają wyn
 Atrybuty opisują wyniki badań krwi pacjentów. Między większością atrybutów zachodzi korelacja (negatywna lub pozytywna). 
 Udało się znaleźć model klasyfikatora, który dla podanych danych testowych osiąga potrafi przewidzieć, czy pacjent przeżyje z dokładnością wynoszącą 95%.
 
-# Przygotowanie srodowiska i danych
+# Przygotowanie środowiska i danych
 
 ## Import bibliotek
 ```{r libs_import, warning=FALSE, message=FALSE}
@@ -59,14 +59,14 @@ custom_summarize<-function(df){
 ```
 
 
-## Wczytanie danych
+## Wstępna analiza danych
 ```{r read_data, warning=FALSE}
 raw_data <- read.xlsx(filename, 1)
 raw_data <- as_tibble(raw_data)
 dim(raw_data)
 ```
 
-## Wstepna analiza surowych danych
+## Analiza danych surowych
 Pierwsze 30 wierszy ze zbioru:
 
 ```{r raw_data1, echo=FALSE}
@@ -101,7 +101,7 @@ custom_summarize(raw_attributes)
 
 ## Transformacja danych
 
-### Wstepne czyszczenie danych
+### Wstępne czyszczenie danych
 
 Wstępne czyszczenie danych:
 
@@ -129,7 +129,7 @@ colnames_cleaned <- no_empty_cols %>% clean_names()
 colnames_cleaned$outcome=factor(colnames_cleaned$outcome, labels = make.names(c("death", "release")))
 colnames_cleaned$gender=factor(colnames_cleaned$gender, labels = make.names(c("M", "F")))
 ```
-### Brakujace wartosci
+### Brakujące wartości
 
 Eliminacja brakujących wartości na poziomie pacjenta obejmowała:
 
@@ -166,7 +166,7 @@ attributes<-cleaned[-(1:7)]
 
 # Wyczyszczone dane - podsumowanie
 
-## Przeglad danych
+## Przegląd danych
 
 
 Podsumowanie zbioru:
@@ -238,7 +238,7 @@ Tabela pokazująca 30 pierwszych rekordów po wyczyszczeniu danych:
 DT::datatable(head(cleaned,30), style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
 ```
 
-## Analiza wartosci atrybutow
+## Analiza wartości atrybutów
 
 Podsumowanie każdego z atrybutów:
 
@@ -269,7 +269,7 @@ page_plot(i, plot_row, plot_col)
 ```
 
 
-## Korelacja miedzy atrybutami
+## Korelacja między atrybutami
 
 Poniższy graf przedstawia korelację pomiędzy parami atrybutów. Grubość lini łączącej dwa atrybuty jest zależna od współczynnika korelacji, natomiast kolor oznacza korelację dodatnią (kolor zielony) lub ujemną (kolor czerwony)
 
@@ -311,7 +311,7 @@ ggplotly(timeline_plot)
 Przygotowanie danych do klasyfikacji:
  
  * redukcja danych opisujacych pojedynczego pacjenta do jednego wiersza, z zachowaniem najwcześniejszych wartosci atrybutów (żeby jak najszybciej przewidziec śmierć pacjenta)
- * usunięcie kolumn niebędących atrybutami
+ * usunięcie kolumn patient_id oraz re_date
  * podział na zbiory uczący i testujący
  * usunięcie wierszy i kolumn, w ktorych wartości brakujące to wiecej niż 20% danych
  * przypisanie wartości średniej atrybutów do pozostałych wartości brakujących
