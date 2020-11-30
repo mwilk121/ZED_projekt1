@@ -12,7 +12,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = TRUE, eval=TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE, eval=FALSE)
 ```
 
 # Podsumowanie
@@ -64,10 +64,10 @@ dim(raw_data)
 ```
 
 ## Wstepna analiza surowych danych
-Pierwsze 500 wierszy ze zbioru:
+Pierwsze 30 wierszy ze zbioru:
 
 ```{r raw_data1, echo=FALSE}
-DT::datatable(head(raw_data, 500), style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip'))
+DT::datatable(head(raw_data, 30), style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip'))
 ```
 ***
 Podstawowe statystyki dla calego zbioru:
@@ -106,7 +106,8 @@ Wstepne czyszczenie danych:
 * zmiana nazw kolumn  
 
 ```{r transform_data, eval=TRUE}
-#raw_data[raw_data==-1]<-NA
+#replace -1 with NA
+raw_data[raw_data==-1]<-NA
 
 #filling PATIENT_ID
 id_filled <- raw_data %>% fill(PATIENT_ID)
@@ -119,6 +120,8 @@ no_empty_cols <- no_empty_rows[colSums(!is.na(no_empty_rows)) > 0]
 #renaming columns
 colnames_cleaned <- no_empty_cols %>% clean_names()
 
+colnames_cleaned$outcome=factor(colnames_cleaned$outcome, labels = make.names(c("death", "release")))
+colnames_cleaned$gender=factor(colnames_cleaned$gender, labels = make.names(c("M", "F")))
 ```
 ### Brakujace wartosci
 
@@ -163,21 +166,19 @@ attributes<-cleaned[-(1:7)]
 Podsumowanie zbioru:
 
 ```{r clean_data_stats, message=FALSE,results="hide", echo=FALSE}
-mean_gender_outcome <- cleaned %>% select(patient_id, outcome, gender) %>% group_by(patient_id) %>% summarise(outcome_count = mean(outcome), gender_count =  mean(gender))
+mean_gender_outcome <- cleaned %>% select(patient_id, outcome, gender) %>% group_by(patient_id) %>% summarise(outcome_count = first(outcome), gender_count =  first(gender))
 
 # get some info about all data
 all_dim <-dim(cleaned)
 patients_count <- length(unique(cleaned$patient_id))-1
 measurements_count <- all_dim[1]
-mean_measures <- round(measurements_count/patients_count,0)
-genders <- mean_gender_outcome %>% count(gender_count) #Male 224, Female 151 # 1-M, 2-F
-outcomes <- mean_gender_outcome %>% count(outcome_count) #201 recovered, 174 died # 0-Fatality, 1-Alive
+mean_measures <- round(measurements_count/patients_count)
 columns_count <- all_dim[2]
 vars_count <- dim(attributes)[2]
 na_left <- round(100*mean(is.na(cleaned)), 0)
 
-titles <- c("Liczba pacjentów", "Liczba pomiarów", "Średnia liczba pomiarów na pacjenta", "K", "M", "Smierc", "Wypisanie ze szpitala", "Liczba wierszy", "Liczba zmiennych", "Procent brakujacych wartosci")
-values <- c(patients_count,measurements_count,mean_measures,genders$n[1], genders$n[2], outcomes$n[1], outcomes$n[2], columns_count,vars_count, na_left)
+titles <- c("Liczba pacjentów", "Liczba pomiarów", "Średnia liczba pomiarów na pacjenta","Liczba kolumn", "Liczba zmiennych", "Procent brakujacych wartosci")
+values <- c(patients_count,measurements_count,mean_measures, columns_count,vars_count, na_left)
 info_table <- tibble(
   titles,
   values
@@ -202,7 +203,7 @@ plot_data %>% distr(outcome, gender)
 Wykres obrazujący czasy przyjęcia i wypisania lub śmierci z wyróżnieniem płci:
 
 ```{r clean_data_plot_timeline, warning=FALSE, message=FALSE, echo=FALSE}
-
+# todo
 admission_plot <- ggplot() + 
     coord_cartesian() +
     scale_color_hue() +
@@ -261,7 +262,7 @@ page_plot(i, plot_row, plot_col)
 ```
 
 
-## Korelacja miedzy danymi
+## Korelacja miedzy atrybutami
 
 Poniższy graf przedstawia korelację pomiędzy parami atrybutów. Grubość lini łączącej dwa atrybuty jest zależna od współczynnika korelacji, natomiast kolor oznacza korelację dodatnią (kolor zielony) lub ujemną (kolor czerwony)
 
@@ -284,9 +285,10 @@ ggplotly(plot_data)
 
 ## Zmiana atrybutów w czasie
 
-Poniższy wykres przedstawia średnie wartości atrybutów hemoglobin (poziom hemoglobiny we krwi) oraz glucose (poziom glukozy we krwi) dla poszczególnych dni pobytu pacjenta w szpitalu. Celem wykresu jest próba pokazania zmiany tych atrybutów w czasie hospitalizacji, czyli z założenia najcięższego przebiegu choroby. 
+Poniższy wykres przedstawia wartości atrybutów hemoglobin (poziom hemoglobiny we krwi) oraz glucose (poziom glukozy we krwi) dla poszczególnych dni pobytu pacjenta w szpitalu. Celem wykresu jest próba pokazania zmiany tych atrybutów w czasie hospitalizacji pacjentów. 
 
 ```{r timeline3, echo=FALSE, warning=FALSE, message=FALSE}
+# todo linia z wartoscia srednia
 timeline_data  <-cleaned%>%select(patient_id,re_date, hemoglobin, glucose, outcome, gender) %>% transmute(id=patient_id, re_date=as.Date(re_date), hemoglobin, glucose, outcome, gender) %>%group_by(id, re_date) %>% summarise(avg_hemoglobin = mean(hemoglobin), avg_glucose=mean(glucose), outcome=first(outcome), gender=first(gender)) %>%group_by(id) %>% mutate(day_no=re_date-min(re_date)+1, avg_hemoglobin=round(avg_hemoglobin,2), avg_glucose=round(avg_glucose,2))%>%ungroup() %>%select(day_no,avg_hemoglobin, avg_glucose, outcome, gender)
 
 timeline_plot <- ggplot(timeline_data,aes(day_no,avg_hemoglobin,fill=factor(gender) ))+geom_point(color="black", shape=15)+geom_point(aes(day_no,avg_glucose,fill=factor(gender) ),shape=19,color="black") + facet_wrap(~outcome)
@@ -296,22 +298,18 @@ ggplotly(timeline_plot)
 
 
 # Klasyfikator
-klasyfikator przewidujący czy dany pacjent przeżyje (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność klasyfikacji powinna zostać oszacowana na podstawie kliku wybranych (i uzasadnionych) miar oceny klasyfikacji.
-***
-
 Przygotowanie danych do klasyfikacji:
  
- * redukcja danuch opisujacych pojedynczego pacjenta do jednego wiersza, z zachowaniem najwczesniejszych wartosci atrybutow (żeby przewidziec smierc pacjenta jak najwczesniej)
+ * redukcja danych opisujacych pojedynczego pacjenta do jednego wiersza, z zachowaniem najwczesniejszych wartosci atrybutow (żeby przewidziec smierc pacjenta jak najwczesniej)
  * usuniecie kolumn niebedacych atrybutami
  * podzial na zbiory uczacy i testujacy
  * usuniecie wierszy i kolumn, w ktorych wartosci brakujace to wiecej niz 40% danych
  * przypisanie wartosci sredniej atrybutow do wartosci brakujacych
  
-```{r preparing_data, eval=TRUE, echo=FALSE, warning=FALSE, message=FALSE}
+```{r preparing_data, echo=FALSE, warning=FALSE, message=FALSE}
 ml_data<- cleaned%>%group_by(patient_id)%>%summarise_all(funs(first))
-ml_data$outcome=factor(ml_data$outcome, labels = make.names(c("negative", "positive")))
 ml_data<-ml_data[-(1:6)]
-ml_data<-ml_data[which(rowMeans(!is.na(ml_data)) > 0.4), which(colMeans(!is.na(ml_data)) > 0.4)]
+ml_data<-ml_data[which(rowMeans(!is.na(ml_data)) > 0.8), which(colMeans(!is.na(ml_data)) > 0.8)]
 
 inTraining <- createDataPartition( y = ml_data$outcome, p = .75, list = FALSE)
 training <- ml_data[ inTraining,]
@@ -322,16 +320,14 @@ testing <-na_mean(testing)
 ***
 Budowa klasyfikatora:
 
-```{r classificator, eval=TRUE, warning=FALSE, message=FALSE}
+```{r classificator, warning=FALSE, message=FALSE}
 tune_grid <- expand.grid(mtry = 10:30)
-
 gridCtrl <- trainControl(
     method = "repeatedcv",
     summaryFunction = twoClassSummary,
     classProbs = TRUE,
     number = 2,
-    repeats = 5)
-
+    repeats = 10)
 fitTune <- train(outcome ~ .,
              data = training,
              method = "rf",
@@ -340,7 +336,6 @@ fitTune <- train(outcome ~ .,
              trControl = gridCtrl,
              tuneGrid = tune_grid,
              ntree = 30)
-
 prediction <- predict(fitTune,
                          newdata = testing)
 
@@ -351,17 +346,11 @@ prediction <- predict(fitTune,
 
 Podsumowanie rezultatu:
 
-```{r ml_visualization, eval=TRUE}
+```{r ml_visualization}
 ggplot(fitTune) + theme_bw()
 
 confusionMatrix(data = prediction, 
                 testing$outcome)
 ```
 
-
-
-## Dodatkowa analiza
-analiza typowa dla danych klinicznych, np.: 
-
-* regresja logistyczna wraz z wzięciem pod uwagę czynników zakłócających (ang. confounding factors)  
-* regresja Coxa (ang. Cox Proportional-Hazards Model).  
+Dokładność predykcji wynosi 93% i z pewnością nie jest to najlepszy możliwy wynik. Warto jednak zwrócić uwagę na wartości otrzymane w macierzy pomyłek: liczba uzyskanych wartości False Negative (model przewidział, że pacjent przeżyje, a w rzeczywistości on umiera) jest równa zero. W rozważanym przypadku lepiej zakładać, że pacjent jest w stanie gorszym niż jest w rzeczywistości, niż odwrotnie.
