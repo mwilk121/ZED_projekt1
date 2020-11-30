@@ -12,7 +12,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = FALSE, eval=TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = FALSE)
 ```
 
 # Podsumowanie
@@ -23,7 +23,7 @@ Atrybuty opisują wyniki badań krwi pacjentów. Między większością atrybut�
 # Przygotowanie srodowiska i danych
 
 ## Import bibliotek
-```{r libs_import, warning=FALSE, eval=TRUE, message=FALSE}
+```{r libs_import, warning=FALSE, message=FALSE}
 library(xlsx)
 library(DT)
 library(knitr)
@@ -38,7 +38,7 @@ library(qgraph)
 library(ggforce)
 ```
 
-```{r init, include=FALSE, eval=TRUE}
+```{r init, include=FALSE}
 set.seed(23)
 filename <- 'res/wuhan_blood_sample_data_Jan_Feb_2020.xlsx'
 
@@ -59,7 +59,7 @@ custom_summarize<-function(df){
 
 
 ## Wczytanie danych
-```{r read_data, warning=FALSE, eval=TRUE}
+```{r read_data, warning=FALSE}
 raw_data <- read.xlsx(filename, 1)
 raw_data <- as_tibble(raw_data)
 dim(raw_data)
@@ -110,7 +110,7 @@ Wstępne czyszczenie danych:
 * zmiana nazw kolumn
 * przypisanie czytelnych wartości w kolumnach outcome (wynik) i gender (płeć)
 
-```{r transform_data, eval=TRUE}
+```{r transform_data}
 #replace -1 with NA
 raw_data[raw_data==-1]<-NA
 
@@ -137,7 +137,7 @@ Eliminacja brakujących wartości na poziomie pacjenta obejmowała:
 
 Jeżeli żadne z powyższych rozwiązań nie było możliwe, wartości NA zostawiono.
 
-```{r NA_cleaning, eval=TRUE, warning=FALSE, results="hide"}
+```{r NA_cleaning, warning=FALSE, results="hide"}
 clean_NA<-function(column){
   not_NA_count<-sum(!is.na(column))
   if (not_NA_count>=2){ #interpolate
@@ -293,7 +293,7 @@ ggplotly(plot_data)
 
 Poniższy wykres przedstawia wartości atrybutów hemoglobin (poziom hemoglobiny we krwi) oraz glucose (poziom glukozy we krwi) dla poszczególnych dni pobytu pacjenta w szpitalu. Celem wykresu jest próba pokazania zmiany tych atrybutów w czasie hospitalizacji pacjentów. 
 
-```{r timeline3, echo=FALSE, warning=FALSE, message=FALSE, eval=TRUE}
+```{r timeline3, echo=FALSE, warning=FALSE, message=FALSE}
 timeline_data  <-cleaned%>%select(patient_id,re_date, hemoglobin, glucose, outcome, gender) %>% transmute(id=patient_id, re_date=as.Date(re_date), hemoglobin, glucose, outcome, gender) %>%group_by(id, re_date) %>% summarise(avg_hemoglobin = mean(hemoglobin), avg_glucose=mean(glucose), outcome=first(outcome), gender=first(gender)) %>%group_by(id) %>% mutate(day_no=re_date-min(re_date)+1, avg_hemoglobin=round(avg_hemoglobin,2), avg_glucose=round(avg_glucose,2))%>%ungroup() %>%select(day_no,avg_hemoglobin, avg_glucose, outcome, gender)
 
 mean_h <- timeline_data %>% group_by(day_no, gender) %>%summarise(mean_hemoglobin=mean(avg_hemoglobin, na.rm=TRUE))
