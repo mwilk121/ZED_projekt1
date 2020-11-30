@@ -12,44 +12,16 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE, eval=FALSE)
 ```
-# Wymagania
 
-## Dane
-  {r} [Zrodlo] danych] (http://www.cs.put.poznan.pl/dbrzezinski/teaching/zed/wuhan_blood_sample_data_Jan_Feb_2020.xlsx)
-  {r} [Opis danych] (https://www.nature.com/articles/s42256-020-0180-7)
-
-## Executive summary
-raport powinien zaczynać się od rozdziału podsumowującego całą analizę, streszczającego najważniejsze spostrzeżenia analityka
-
-
-## Lista wymagan minimalnych [kolejnosc dowolna]
-Kod wyliczający wykorzystane biblioteki.
-Kod zapewniający powtarzalność wyników przy każdym uruchomieniu raportu na tych samych danych.
-Kod pozwalający wczytać dane z pliku.
-Kod czyszczący dane (np. zmiany nazw kolumn, tranformacja danych do innych jednostek, decyzje dotyczące brakujących danych).
-Sekcję podsumowującą rozmiar zbioru i podstawowe statystyki.
-Szczegółową analizę wartości atrybutów.
-Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji.
-Interaktywny wykres lub animację prezentującą zmianę wybranych atrybutów w czasie.
-Sekcję próbującą stworzyć klasyfikator przewidujący czy dany pacjent przeżyje (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność klasyfikacji powinna zostać oszacowana na podstawie kliku wybranych (i uzasadnionych) miar oceny klasyfikacji.
-Analizę ważności atrybutów najlepszego znalezionego modelu.
-Dodatkowo punktowane będzie wykonanie analizy typowej dla danych klinicznych, np. regresji logistycznej wraz z wzięciem pod uwagę czynników zakłócających (ang. confounding factors) lub regresji Coxa (ang. Cox Proportional-Hazards Model).
-
-## Dodatkowe uwagi
-Analityk nie musi, a nawet nie powinien, ograniczać się do powyższych punktów. Wszelkie dodatkowe techniki analizy danych, wizualizacje, spostrzeżenia będą pozytywnie wpływały na ocenę.
-
-Ewentualne konkluzje, znalezione zależności warto potwierdzić dokonując sprawdzenia istniejących wyników badań w literaturze naukowej (np. na Google Scholar czy PubMed).
-
-
-# Wykonanie
-
-## Podsumowanie
+# Podsumowanie
 TBA
 
+# Przygotowanie srodowiska i danych
+
 ## Import bibliotek
-```{r libs_import, warning=FALSE}
+```{r libs_import, warning=FALSE, eval=TRUE, message=FALSE}
 library(xlsx)
 library(DT)
 library(knitr)
@@ -64,116 +36,150 @@ library(qgraph)
 library(ggforce)
 ```
 
-## Wczytanie i wstepna analiza danych
-### Wczytanie danych, 
-```{r read_data, warning=FALSE, cache = TRUE}
+```{r init, include=FALSE, eval=TRUE}
+set.seed(23)
 filename <- 'res/wuhan_blood_sample_data_Jan_Feb_2020.xlsx'
+
+custom_summarize<-function(df){
+res<-df%>%sapply(function(x){
+    c(
+        min=round(min(x,na.rm = TRUE),2), 
+        median=round(median(x,na.rm = TRUE),2), 
+        mean = round(mean(x,na.rm = TRUE),2),
+        max=round(max(x,na.rm = TRUE),2), 
+        variance=round(var(x,na.rm = TRUE),2), 
+        standard_deviation=round(sd(x,na.rm = TRUE),2), 
+        na_count = sum(is.na(x)
+        ))}) %>%  data.frame()
+  DT::datatable(res, style="bootstrap", filter = "top", rownames = TRUE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
+}
+
+```
+
+
+
+## Wczytanie i wstepna analiza danych
+
+### Wczytanie danych
+```{r read_data, warning=FALSE, eval=TRUE}
 raw_data <- read.xlsx(filename, 1)
 raw_data <- as_tibble(raw_data)
+dim(raw_data)
 ```
-### Sprawdzenie surowych danych
 
-```{r peek_data}
-# OK
-#how many NA in variables
-mean(is.na(raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)))
-# var min i max
-min(raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD), na.rm = TRUE)
-max(raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD), na.rm = TRUE)
+### Krótka analiza surowych danych
+Pierwsze 500 wierszy ze zbioru:
 
-glimpse(raw_data)
-mean(is.na(raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)))
+```{r raw_data1, eval=TRUE, echo=FALSE}
+DT::datatable(head(raw_data, 500), style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip'))
+```
 
+Podstawowe statystyki dla calego zbioru:
 
+```{r raw_data2, eval=TRUE, echo=FALSE}
+raw_attributes<-raw_data %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)
+
+na_mean<-round(100*mean(is.na(raw_attributes)),0)
+min_val<-min(raw_attributes, na.rm = TRUE)
+max_val<-max(raw_attributes, na.rm = TRUE)
+patients<-length(unique(raw_data$PATIENT_ID))-1
+min_admission_date<-min(raw_data$Admission.time)
+max_admission_date<-min(raw_data$Discharge.time)
+
+writeLines(paste(" Dane bedace wartoscami brakujacymi (NA): ", na_mean, "%", "\n",
+"Wartosc minimalna: ", min_val, "\n",
+"Wartosc maksymalna: ", max_val, "\n",
+"Liczba pacjentów: ", patients, "\n",
+"Okres zbierania danych: ", min_admission_date," - ",max_admission_date))
+
+```
+
+Podstawowe statystyki dla poszczegolnych atrybutow:
+
+```{r raw_data3, eval=TRUE, echo=FALSE}
+custom_summarize(raw_attributes)
 ```
 
 ## Transformacja danych
-(np. zmiany nazw kolumn, tranformacja danych do innych jednostek, decyzje dotyczące brakujących danych)
 
-```{r transform_data}
-# NOT OK
-#ogarnac te brakujace daty -- tyle ze ich nie ma?
-# kolumny z samimy na
+### Wstepne czyszczenie danych
+Wstepne czyszczenie danych:
 
+* uzupelnienie kolumny PATIENT_ID  
+* usuniecie pustych wierszy i kolumn  
+* zmiana nazw kolumn  
 
-#replace -1 with NA
-raw_data[raw_data==-1]<-NA
+```{r transform_data, eval=TRUE}
+#raw_data[raw_data==-1]<-NA
 
-#PATIENT_ID
+#filling PATIENT_ID
 id_filled <- raw_data %>% fill(PATIENT_ID)
-
-
-#OTHER NA VALUES
-#is there any row that doesn't have NA value?
-full_row_count <-dim(id_filled[complete.cases(id_filled),])[1]
-print(full_row_count)
-# NA values in variables:
-mean(is.na(id_filled %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)))
-# there are two patients with negative days, as their only blood sample results arrived one day after their clinical outcome
-
 
 #remove rows where all variables are empty
 vars <- colnames(id_filled)[-(1:7)]
 no_empty_rows<- id_filled[rowSums(is.na(id_filled[vars])) != length(vars), ]
 no_empty_cols <- no_empty_rows[colSums(!is.na(no_empty_rows)) > 0]
-# NA values in variables:
-mean(is.na(no_empty_rows %>% select(Hypersensitive.cardiac.troponinI : RBC.distribution.width.SD)))
 
+#renaming columns
 colnames_cleaned <- no_empty_cols %>% clean_names()
 
 ```
-NA Values:
+### Brakujace wartosci
 
-```{r NA_cleaning, cache=TRUE}
+Eliminacja brakujących wartości na poziomie pacjenta obejmowała:
+
+* interpolację, jeżeli w kolumnie były co najmniej dwie wartości niebędące NA
+* stała wartość, jezeli w kolumnie byla dokladnie jedna wartość niebędąca NA
+
+Jeżeli żadne z powyższych rozwiązań nie było możliwe, wartości NA zostawiono.
+
+```{r NA_cleaning, eval=TRUE, warning=FALSE, results="hide"}
 clean_NA<-function(column){
   not_NA_count<-sum(!is.na(column))
-  if (not_NA_count>=2){
+  if (not_NA_count>=2){ #interpolate
     column <- na_interpolation(column, option = "linear")
     column
   }
 
-  else if (not_NA_count==1){
+  else if (not_NA_count==1){ #constant value
     val <- first(na.omit(column))
     column[is.na(column)] <- val
     column
-  }
+  }#default: leave NA values
   column
 }
 
-cleaned<- colnames_cleaned%>% group_by(patient_id) %>% mutate_each(funs(clean_NA))
-var_df<-cleaned[-(1:7)]
+#for each patient:
+# for each column:
+#  clean_NA
+cleaned<- colnames_cleaned%>% group_by(patient_id) %>% mutate_each(list(clean_NA))
+
+#extract columns with attibutes only
+attributes<-cleaned[-(1:7)]
 ```
 
 
-## Prezentacja czystych danych
-"Sekcja podsumowująca rozmiar zbioru i podstawowe statystyki"
-Szczegółowa analiza wartości atrybutów.
+# Wyczyszczone dane - podsumowanie
 
-```{r clean_data}
+Tabela pokazująca wyczyszczone dane:
 
-
+```{r clean_data, eval=TRUE}
 DT::datatable(cleaned, style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(scrollX = TRUE, dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel')))
 ```
 
-```{r clean_data_stats}
+Podsumowanie zbioru:
+
+```{r clean_data_stats, eval=TRUE}
 all_dim <-dim(cleaned)
 tmp <- cleaned %>% select(patient_id, outcome, gender) %>% group_by(patient_id) %>% summarise(outcome_count = mean(outcome), gender_count =  mean(gender))
 
-# ile pacjentow
-patients_count <- length(distinct(cleaned, patient_id)$patient_id)
-# ile pomiarow
+patients_count <- length(unique(raw_data$PATIENT_ID))-1
 measurements_count <- all_dim[1]
-# ile srednio pomiarow na pacjenta
 mean_measures <- measurements_count/patients_count
-# ile kobiet/mezczyzn
 genders <- tmp %>% count(gender_count) #Male 224, Female 151 # WYKRES
-# ile umarlo/przezylo
 outcomes <- tmp %>% count(outcome_count) #201 recovered, 174 died # WYKRES
-# ile kolumn
 columns_count <- all_dim[2]
-# ile atrybutow
 vars_count <- all_dim[2]-7
-# ile zostalo wartosci NA
 na_left <- round(100*mean(is.na(cleaned)), 0)
 
 titles <- c("Liczba pacjentów", "Liczba pomiarów", "Średnia liczba pomiarów", "K", "M", "Smierc", "Zycie :(", "Liczba wierszy", "Liczba zmiennych", "Brakujace wartosci [%]")
@@ -183,6 +189,7 @@ info_table <- data_frame(
   values
 )
 knitr::kable(info_table)
+
 cleaned %>% distr(outcome, gender)
 
 #wykres death_bothgenders, alive_bothgenders
@@ -214,7 +221,7 @@ ggplotly(admission_plot)
 Szczegółową analizę wartości atrybutów.
 ```{r analiza}
 #data.frame(unclass(summary(tmp)), check.names = FALSE, stringsAsFactors = FALSE)
-res <- var_df%>% sapply(function(x){c(min=min(x,na.rm = TRUE), median=median(x,na.rm = TRUE), mean = mean(x,na.rm = TRUE),max=max(x,na.rm = TRUE), variance=var(x,na.rm = TRUE), standard_deviation=sd(x,na.rm = TRUE), na_count = sum(is.na(x)))}) %>%  data.frame()
+res <- attributes%>% sapply(function(x){c(min=min(x,na.rm = TRUE), median=median(x,na.rm = TRUE), mean = mean(x,na.rm = TRUE),max=max(x,na.rm = TRUE), variance=var(x,na.rm = TRUE), standard_deviation=sd(x,na.rm = TRUE), na_count = sum(is.na(x)))}) %>%  data.frame()
 rd<- dim(res)
 rows<-rd[1]
 cols<-rd[2]
@@ -226,7 +233,7 @@ DT::datatable(res, style="bootstrap", filter = "top", rownames = FALSE, extensio
 
 page_plot<-function(page_no, prow=3, pcol=3){
   print(
-  ggplot(gather(var_df), na.action="na.omit", aes(value)) +   ggtitle(" title")+
+  ggplot(gather(attributes), na.action="na.omit", aes(value)) +   ggtitle(" title")+
     geom_histogram(bins = 10) + 
     facet_wrap_paginate
   (~key, ncol = pcol, nrow = prow, scales = "free_x", page = page_no)) 
@@ -247,7 +254,7 @@ page_plot(i, plot_row, plot_col)
 "Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji."
 
 ```{r correlation_top}
-plot_data <- corr_cross(var_df, 
+plot_data <- corr_cross(attributes, 
 max_pvalue = 0.05,
 top = 20,
 rm.na=TRUE)
@@ -255,9 +262,9 @@ ggplotly(plot_data)
 ```
 
 ```{r correlation_all, fig.height=40, fig.width=40}
-names<-colnames(var_df)
-Q <- qgraph(cor(var_df, use="complete.obs"), legend=TRUE, nodeNames=names, legend.cex=1.3, title ="Korelacja pomiedzy atrybutami", title.cex=8)
-Q <- qgraph(cor(var_df, use="complete.obs"), layout = "spring", legend=TRUE, nodeNames=names, legend.cex=1.3, title ="Korelacja pomiedzy atrybutami",title.cex=8)
+names<-colnames(attributes)
+Q <- qgraph(cor(attributes, use="complete.obs"), legend=TRUE, nodeNames=names, legend.cex=1.3, title ="Korelacja pomiedzy atrybutami", title.cex=8)
+Q <- qgraph(cor(attributes, use="complete.obs"), layout = "spring", legend=TRUE, nodeNames=names, legend.cex=1.3, title ="Korelacja pomiedzy atrybutami",title.cex=8)
 ```
 
 ## Zmiana [atrybutu/ow] w czasie
@@ -310,7 +317,7 @@ ml_data<-na_mean(ml_data) #TO ZROBIC OSOBNO DLA ZBIORU TESTUJACEGO I UCZACEGO!
 ml_data$outcome=factor(ml_data$outcome, 
                         labels = make.names(c("negative", "positive")))
 
-set.seed(23)
+
 inTraining <- 
     createDataPartition(
         # atrybut do stratyfikacji
@@ -355,7 +362,7 @@ gridCtrl <- trainControl(
     number = 2,
     repeats = 5)
 
-set.seed(23)
+
 fitTune <- train(outcome ~ .,
              data = training,
              method = "rf",
